@@ -19,6 +19,16 @@ class CameraService {
     await controller!.initialize();
   }
 
+  Future<XFile?> captureImage() async {
+    if (controller == null ||
+        !controller!.value.isInitialized ||
+        controller!.value.isTakingPicture) {
+      return null;
+    }
+
+    return await controller!.takePicture();
+  }
+
   Future<void> dispose() async {
     await controller?.dispose();
     controller = null;

@@ -19,6 +19,7 @@ class PrivacyManager {
       // Request permission if not already granted
       await FlutterOverlayWindow.requestPermission();
     }
+    
   }
 
   // Call this method when the threat is gone to dismiss the shield

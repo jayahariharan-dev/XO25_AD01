@@ -1,10 +1,17 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:io';
+
 import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import '../camera/camera_service.dart';
+import '../detection/face_detector.dart';
+import '../detection/threat_detector.dart';
 import '../widgets/protection_status.dart';
 import '../widgets/face_counter.dart';
 import '../widgets/monitoring_card.dart';
+import '../privacy/privacy_manager.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,13 +22,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool protectionEnabled = true;
+  int faceCount = 0;
+  bool _cameraReady = false;
+  bool _isProcessing = false;
 
-  // Temporary value.
-  // Later this will come from ML Kit.
-  int faceCount = 1;
+  Timer? _detectionTimer;
 
   final CameraService _cameraService = CameraService();
-  bool _cameraReady = false;
+  final FaceDetectorService _faceDetector = FaceDetectorService();
 
   @override
   void initState() {
@@ -33,24 +41,85 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await _cameraService.initialize();
 
-      if (mounted) {
-        setState(() {
-          _cameraReady = true;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _cameraReady = true;
+      });
+
+      // Check for faces every 1 second.
+      _detectionTimer = Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) => _detectFaces(),
+      );
     } catch (e) {
       debugPrint('Camera initialization failed: $e');
     }
   }
 
+  Future<void> _detectFaces() async {
+    if (_isProcessing) return;
+
+    final controller = _cameraService.controller;
+
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+
+    _isProcessing = true;
+
+    try {
+      final image = await _cameraService.captureImage();
+
+      if (image == null) return;
+
+      final inputImage = InputImage.fromFilePath(image.path);
+
+      final faces = await _faceDetector.detectFaces(inputImage);
+
+      if (!mounted) return;
+
+      setState(() {
+        faceCount = faces.length;
+      });
+
+      final threat = ThreatDetector.isThreat(faces.length);
+
+      if (protectionEnabled) {
+        if (threat) {
+          await PrivacyManager.activatePrivacyShield();
+        } else {
+          await PrivacyManager.deactivatePrivacyShield();
+        }
+      }
+
+      debugPrint(
+        'LOOKOUT: Faces = ${faces.length} | Threat = $threat',
+      );
+
+      // Delete temporary captured image.
+      try {
+        await File(image.path).delete();
+      } catch (_) {}
+    } catch (e) {
+      debugPrint('Face detection error: $e');
+    } finally {
+      _isProcessing = false;
+    }
+  }
+
   @override
   void dispose() {
+    _detectionTimer?.cancel();
+    _faceDetector.dispose();
     _cameraService.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isThreat = ThreatDetector.isThreat(faceCount);
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -71,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 12),
             const Text(
-              "LookOut",
+              'LookOut',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -86,7 +155,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -94,28 +162,22 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 15),
-
               const Text(
-                "Public Screen Protection",
+                'Public Screen Protection',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Text(
-                "LookOut keeps your screen private by detecting people around you.",
+                'LookOut keeps your screen private by detecting people around you.',
                 style: TextStyle(
                   fontSize: 15,
                   color: Colors.grey.shade400,
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // Camera preview
               if (_cameraReady &&
                   _cameraService.controller != null &&
                   _cameraService.controller!.value.isInitialized)
@@ -129,8 +191,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: SizedBox(
                         width: _cameraService
                             .controller!.value.previewSize!.height,
-                        height: _cameraService
-                            .controller!.value.previewSize!.width,
+                        height:
+                            _cameraService.controller!.value.previewSize!.width,
                         child: CameraPreview(
                           _cameraService.controller!,
                         ),
@@ -150,37 +212,36 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: CircularProgressIndicator(),
                   ),
                 ),
-
               const SizedBox(height: 20),
-
               ProtectionStatus(
                 enabled: protectionEnabled,
               ),
-
               const SizedBox(height: 20),
-
               FaceCounter(
                 faceCount: faceCount,
               ),
-
               const SizedBox(height: 20),
-
               const MonitoringCard(),
-
               const SizedBox(height: 25),
-
+              Text(
+                isThreat ? '⚠️ Privacy threat detected' : '🟢 Screen is safe',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 15),
               Row(
                 children: [
                   const Expanded(
                     child: Text(
-                      "Privacy Protection",
+                      'Privacy Protection',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-
                   Switch(
                     value: protectionEnabled,
                     activeThumbColor: const Color(0xFF7C3AED),
@@ -192,7 +253,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 15),
             ],
           ),
