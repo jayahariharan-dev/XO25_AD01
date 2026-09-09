@@ -1,12 +1,12 @@
 # LookOut — Public Screen Privacy Protection
 
-> **Hackathon Project:** 24-Hour Android Development Hackathon  
-> **Stack:** Android (Kotlin) | CameraX | Google ML Kit (100% Free / On-Device)
+> **Hackathon Project:** 24-Hour Mobile Development Hackathon  
+> **Stack:** Flutter (Dart) | Google ML Kit (100% Free / On-Device)
 
 ---
 
 ## 📌 Overview
-**LookOut** prevents shoulder surfing in public places. Using the front camera and real-time on-device Machine Learning, it automatically covers the screen when an unauthorized onlooker is detected.
+**LookOut** prevents shoulder surfing in public places. Using the device's front camera and real-time on-device Machine Learning, it automatically covers the screen with a privacy overlay when an unauthorized onlooker is detected behind or beside you.
 
 ---
 
@@ -16,17 +16,18 @@
 - **2+ Faces Detected:** 🚨 **PRIVACY PROTECTION TRIGGERED**
 
 ```text
-Front Camera ──► CameraX ──► ML Kit Face Counting
-                                  │
-      ┌───────────────────────────┴──────────────────────────┐
-      ▼                                                      ▼
-0 or 1 Face                                               2+ Faces
-(Normal Screen)                                   (Full-Screen Cover + Notification)
-                                                             │
-                                                     User taps RESET
-                                                             │
-                                                      ▼
-                                                Normal Screen
+Front Camera ──► Camera Plugin ──► ML Kit Face Counting
+                                        │
+      ┌─────────────────────────────────┴────────────────────────────────┐
+      ▼                                                                  ▼
+0 or 1 Face                                                         2+ Faces
+(Normal Screen)                                             (Full-Screen Privacy Overlay
+                                                              + Notification Alert)
+                                                                         │
+                                                                 User taps RESET
+                                                                         │
+                                                                         ▼
+                                                                   Normal Screen
 ```
 
 ---
@@ -35,72 +36,86 @@ Front Camera ──► CameraX ──► ML Kit Face Counting
 
 | Member | Focus Area | Key Deliverables |
 | :--- | :--- | :--- |
-| **Member 1** | Camera & ML | `CameraX` setup, `FaceAnalyzer.kt`, face count logic |
-| **Member 2** | Protection & Overlay | Privacy overlay screen/service, RESET action |
-| **Member 3** | UI & Notifications | `MainActivity`, permissions, `NotificationHelper`, end-to-end testing |
+| **Member 1** | Camera & ML | `camera` plugin setup, `google_mlkit_face_detection`, face count stream |
+| **Member 2** | Privacy Overlay | Full-screen privacy cover UI widget, reset trigger logic |
+| **Member 3** | UI & Notifications | Main Flutter UI, `flutter_local_notifications`, permissions handling, testing |
 
 ---
 
 ## ⚡ Technical Stack (100% Free)
 
-- **Language:** Kotlin (Android Studio)
-- **Camera:** CameraX API
-- **ML Engine:** Google ML Kit Face Detection (On-device, offline, zero cost)
-- **Protection:** System Overlay / Full-Screen Activity Cover
-- **Notifications:** Android NotificationManager
+- **Framework:** Flutter (Dart)
+- **Camera:** `camera` Flutter package
+- **ML Engine:** `google_mlkit_face_detection` (On-device, offline, zero cost)
+- **Overlay:** Full-screen Stack Widget / Flutter Overlay Entry
+- **Notifications:** `flutter_local_notifications` package
 
 ---
 
 ## 🚀 Quick Setup & Dependencies
 
-### 1. Permissions (`AndroidManifest.xml`)
-```xml
-<uses-feature android:name="android.hardware.camera.any" />
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+### 1. Dependencies (`pubspec.yaml`)
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.10.5+9
+  google_mlkit_face_detection: ^0.10.0
+  flutter_local_notifications: ^17.0.0
+  permission_handler: ^11.3.0
 ```
 
-### 2. Dependencies (`build.gradle.kts`)
-```kotlin
-dependencies {
-    // CameraX
-    implementation("androidx.camera:camera-core:1.3.2")
-    implementation("androidx.camera:camera-camera2:1.3.2")
-    implementation("androidx.camera:camera-lifecycle:1.3.2")
-    implementation("androidx.camera:camera-view:1.3.2")
+### 2. Camera & ML Kit Face Counting Logic (`face_detector_service.dart`)
+```dart
+import 'package:camera/camera.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-    // Google ML Kit Face Detection (Free / On-Device)
-    implementation("com.google.mlkit:face-detection:16.1.6")
-}
-```
+class FaceDetectorService {
+  final FaceDetector _faceDetector = FaceDetector(
+    options: FaceDetectorOptions(
+      performanceMode: FaceDetectorMode.fast,
+    ),
+  );
 
-### 3. Face Analyzer Core Logic (`FaceAnalyzer.kt`)
-```kotlin
-class FaceAnalyzer(private val onFaceCountChanged: (Int) -> Unit) : ImageAnalysis.Analyzer {
-    private val detector = FaceDetection.getClient(
-        FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .build()
-    )
+  bool _isProcessing = false;
 
-    @OptIn(ExperimentalGetImage::class)
-    override fun analyze(imageProxy: ImageProxy) {
-        val mediaImage = imageProxy.image
-        if (mediaImage != null) {
-            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-            detector.process(image)
-                .addOnSuccessListener { faces -> onFaceCountChanged(faces.size) }
-                .addOnCompleteListener { imageProxy.close() }
-        } else {
-            imageProxy.close()
-        }
+  Future<void> processCameraImage(
+    CameraImage image, 
+    CameraDescription camera, 
+    Function(int) onFaceCount,
+  ) async {
+    if (_isProcessing) return;
+    _isProcessing = true;
+
+    final WriteBuffer allBytes = WriteBuffer();
+    for (final Plane plane in image.planes) {
+      allBytes.putUint8List(plane.bytes);
     }
+    final bytes = allBytes.done().buffer.asUint8List();
+
+    final inputImage = InputImage.fromBytes(
+      bytes: bytes,
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: InputImageRotationValue.fromRawValue(camera.sensorOrientation) ?? InputImageRotation.rotation0deg,
+        format: InputImageFormatValue.fromRawValue(image.format.raw) ?? InputImageFormat.nv21,
+        bytesPerRow: image.planes[0].bytesPerRow,
+      ),
+    );
+
+    final faces = await _faceDetector.processImage(inputImage);
+    onFaceCount(faces.length);
+    _isProcessing = false;
+  }
+
+  void dispose() {
+    _faceDetector.close();
+  }
 }
 ```
 
 ---
 
 ## 🔒 Privacy Guarantee
-- **No storage:** Camera frames are processed instantly in memory and immediately discarded.
-- **No network use:** 100% on-device processing. No images leave the phone.
+- **No storage:** Camera frames are processed directly in memory and immediately discarded.
+- **No network use:** 100% on-device processing. No video feeds or photos leave the device.
