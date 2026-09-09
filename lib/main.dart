@@ -1,8 +1,22 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
+import 'privacy/privacy_overlay.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const LookOutApp());
+}
+
+// MANDATORY: Entry point for the floating overlay window
+@pragma('vm:entry-point')
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: PrivacyOverlayWidget(),
+    ),
+  );
 }
 
 class LookOutApp extends StatelessWidget {

@@ -1,31 +1,43 @@
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:flutter/foundation.dart';
 
 class PrivacyManager {
-  // Call this method when an intruder is detected to trigger the shield
+  static bool _isShieldActive = false;
+
   static Future<void> activatePrivacyShield() async {
-    // Check if the overlay permission is granted first
-    bool isGranted = await FlutterOverlayWindow.isPermissionGranted();
-    
-    if (isGranted) {
-      // Show the overlay window defined by our overlayMain entry point
-      await FlutterOverlayWindow.showOverlay(
-        enableDrag: false,
-        flag: OverlayFlag.defaultFlag,
-        alignment: OverlayAlignment.center,
-        visibility: NotificationVisibility.visibilityPublic,
-        positionGravity: PositionGravity.none,
-      );
-    } else {
-      // Request permission if not already granted
-      await FlutterOverlayWindow.requestPermission();
+    try {
+      bool? hasPermission = await FlutterOverlayWindow.isPermissionGranted();
+      if (hasPermission != true) {
+        hasPermission = await FlutterOverlayWindow.requestPermission();
+        if (hasPermission != true) return;
+      }
+
+      bool isActive = await FlutterOverlayWindow.isActive();
+
+      if (!isActive && !_isShieldActive) {
+        _isShieldActive = true;
+        await FlutterOverlayWindow.showOverlay(
+          enableDrag: false,
+          flag: OverlayFlag.defaultFlag,
+          alignment: OverlayAlignment.center,
+          visibility: NotificationVisibility.visibilityPublic,
+          positionGravity: PositionGravity.none,
+        );
+      }
+    } catch (e) {
+      debugPrint("Overlay activation error: $e");
     }
-    
   }
 
-  // Call this method when the threat is gone to dismiss the shield
   static Future<void> deactivatePrivacyShield() async {
-    if (await FlutterOverlayWindow.isActive()) {
-      await FlutterOverlayWindow.closeOverlay();
+    try {
+      bool isActive = await FlutterOverlayWindow.isActive();
+      if (isActive && _isShieldActive) {
+        _isShieldActive = false;
+        FlutterOverlayWindow.closeOverlay();
+      }
+    } catch (e) {
+      debugPrint("Overlay close error: $e");
     }
   }
 }

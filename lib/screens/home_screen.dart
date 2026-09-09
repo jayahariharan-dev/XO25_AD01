@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 import '../camera/camera_service.dart';
 import '../detection/face_detector.dart';
@@ -25,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int faceCount = 0;
   bool _cameraReady = false;
   bool _isProcessing = false;
+  bool _shieldActive = false;
 
   Timer? _detectionTimer;
 
@@ -34,30 +36,42 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    FlutterOverlayWindow.overlayListener.listen((data) {
+      if (data == "reset_shield") {
+        setState(() {
+          _shieldActive = false;
+          faceCount = 0;
+        });
+
+        debugPrint("SHIELD: Reset received. Detection resumed.");
+      }
+    });
+
     _initializeCamera();
   }
 
   Future<void> _initializeCamera() async {
-    try {
-      await _cameraService.initialize();
+  try {
+    await _cameraService.initialize();
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      setState(() {
-        _cameraReady = true;
-      });
+    setState(() {
+      _cameraReady = true;
+    });
 
-      // Check for faces every 1 second.
-      _detectionTimer = Timer.periodic(
-        const Duration(milliseconds: 500),
-        (_) => _detectFaces(),
-      );
-    } catch (e) {
-      debugPrint('Camera initialization failed: $e');
-    }
+    _detectionTimer = Timer.periodic(
+      const Duration(milliseconds: 700),
+      (_) => _detectFaces(),
+    );
+  } catch (e) {
+    debugPrint('Camera initialization failed: $e');
   }
+}
 
   Future<void> _detectFaces() async {
+    if (_shieldActive) return;
     if (_isProcessing) return;
 
     final controller = _cameraService.controller;
@@ -87,9 +101,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (protectionEnabled) {
         if (threat) {
-          await PrivacyManager.activatePrivacyShield();
-        } else {
-          await PrivacyManager.deactivatePrivacyShield();
+          _shieldActive = true;
+
+          debugPrint("SHIELD: Threat detected. Stopping detection.");
+
+          try {
+            await PrivacyManager.activatePrivacyShield();
+            debugPrint("SHIELD: Privacy shield activated");
+          } catch (e) {
+            debugPrint("SHIELD ERROR: $e");
+          }
+
+          return;
         }
       }
 
