@@ -1,4 +1,4 @@
-name: shoulder_shield
+name: LookOut
 description: "A new Flutter project for anti-shoulder surfing."
 publish_to: 'none'
 
@@ -10,8 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   permission_handler: ^11.3.1
   flutter_overlay_window: ^0.5.0
+
+  camera: 0.10.6
+  camera_android: 0.10.10+4
+
+  google_mlkit_face_detection: ^0.13.1
 
 dev_dependencies:
   flutter_test:

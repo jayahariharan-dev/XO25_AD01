@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+
+import '../camera/camera_service.dart';
 import '../widgets/protection_status.dart';
 import '../widgets/face_counter.dart';
 import '../widgets/monitoring_card.dart';
@@ -16,6 +19,35 @@ class _HomeScreenState extends State<HomeScreen> {
   // Temporary value.
   // Later this will come from ML Kit.
   int faceCount = 1;
+
+  final CameraService _cameraService = CameraService();
+  bool _cameraReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCamera();
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      await _cameraService.initialize();
+
+      if (mounted) {
+        setState(() {
+          _cameraReady = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Camera initialization failed: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _cameraService.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +88,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               const SizedBox(height: 15),
 
               const Text(
@@ -82,7 +113,45 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
+
+              // Camera preview
+              if (_cameraReady &&
+                  _cameraService.controller != null &&
+                  _cameraService.controller!.value.isInitialized)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 180,
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _cameraService
+                            .controller!.value.previewSize!.height,
+                        height: _cameraService
+                            .controller!.value.previewSize!.width,
+                        child: CameraPreview(
+                          _cameraService.controller!,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade900,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+
+              const SizedBox(height: 20),
 
               ProtectionStatus(
                 enabled: protectionEnabled,
@@ -98,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const MonitoringCard(),
 
-              const Spacer(),
+              const SizedBox(height: 25),
 
               Row(
                 children: [
@@ -114,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   Switch(
                     value: protectionEnabled,
-                    activeColor: const Color(0xFF7C3AED),
+                    activeThumbColor: const Color(0xFF7C3AED),
                     onChanged: (value) {
                       setState(() {
                         protectionEnabled = value;
