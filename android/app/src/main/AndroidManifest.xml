@@ -1,8 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<<<<<<< HEAD
+=======
+<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+>>>>>>> af29114fa1e86c73a82b7c575e62bb8fded595c3
     <application
         android:label="shoulder_shield"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+<<<<<<< HEAD
+=======
+        <service
+    android:name="x.m.flutter_overlay_window.OverlayService"
+    android:exported="false"
+    android:foregroundServiceType="specialUse" />
+>>>>>>> af29114fa1e86c73a82b7c575e62bb8fded595c3
         <activity
             android:name=".MainActivity"
             android:exported="true"
