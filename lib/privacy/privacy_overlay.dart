@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 class PrivacyOverlayWidget extends StatelessWidget {
   const PrivacyOverlayWidget({super.key});
@@ -6,18 +7,18 @@ class PrivacyOverlayWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withOpacity(0.9),
-      child: const Center(
+      color: Colors.black.withOpacity(0.92),
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.lock_rounded,
-              size: 64,
+              size: 70,
               color: Color(0xFF7C3AED),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               "⚠️ PRIVACY SHIELD ACTIVE",
               style: TextStyle(
                 color: Colors.white,
@@ -25,12 +26,39 @@ class PrivacyOverlayWidget extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 8),
-            Text(
-              "Multiple faces detected. Screen protected.",
+            const SizedBox(height: 10),
+            const Text(
+              "Multiple faces detected.\nScreen protected.",
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
+                color: Colors.white70,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              onPressed: () async {
+                debugPrint("OVERLAY: RESET button pressed");
+
+                try {
+                  final result = await FlutterOverlayWindow.closeOverlay();
+                  debugPrint("OVERLAY: close result = $result");
+                } catch (e) {
+                  debugPrint("OVERLAY CLOSE ERROR: $e");
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text(
+                "RESET PROTECTION",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 15,
+                ),
               ),
             ),
           ],

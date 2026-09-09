@@ -38,7 +38,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     FlutterOverlayWindow.overlayListener.listen((data) {
+      debugPrint("MAIN APP: Received overlay data = $data");
+
       if (data == "reset_shield") {
+        if (!mounted) return;
+
         setState(() {
           _shieldActive = false;
           faceCount = 0;
@@ -52,23 +56,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initializeCamera() async {
-  try {
-    await _cameraService.initialize();
+    try {
+      await _cameraService.initialize();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _cameraReady = true;
-    });
+      setState(() {
+        _cameraReady = true;
+      });
 
-    _detectionTimer = Timer.periodic(
-      const Duration(milliseconds: 700),
-      (_) => _detectFaces(),
-    );
-  } catch (e) {
-    debugPrint('Camera initialization failed: $e');
+      _detectionTimer = Timer.periodic(
+        const Duration(milliseconds: 700),
+        (_) => _detectFaces(),
+      );
+    } catch (e) {
+      debugPrint('Camera initialization failed: $e');
+    }
   }
-}
 
   Future<void> _detectFaces() async {
     if (_shieldActive) return;

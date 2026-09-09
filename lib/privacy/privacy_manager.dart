@@ -32,9 +32,11 @@ class PrivacyManager {
   static Future<void> deactivatePrivacyShield() async {
     try {
       bool isActive = await FlutterOverlayWindow.isActive();
+
       if (isActive && _isShieldActive) {
         _isShieldActive = false;
-        FlutterOverlayWindow.closeOverlay();
+        await FlutterOverlayWindow.closeOverlay();
+        debugPrint("SHIELD: Overlay closed");
       }
     } catch (e) {
       debugPrint("Overlay close error: $e");
