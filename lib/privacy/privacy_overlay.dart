@@ -7,7 +7,7 @@ class PrivacyOverlayWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withOpacity(0.92),
+      color: Colors.black.withValues(alpha: 0.92),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
