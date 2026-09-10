@@ -14,6 +14,8 @@ import '../widgets/face_counter.dart';
 import '../widgets/monitoring_card.dart';
 import '../privacy/privacy_manager.dart';
 
+import 'package:flutter/services.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -29,30 +31,47 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _shieldActive = false;
 
   Timer? _detectionTimer;
+  Timer? _shieldCheckTimer;
 
   final CameraService _cameraService = CameraService();
   final FaceDetectorService _faceDetector = FaceDetectorService();
 
+  Future<void> _startBackgroundMonitoring() async {
+    try {
+      await const MethodChannel('lookout/background_monitoring')
+          .invokeMethod('startService');
+
+      debugPrint("BACKGROUND: Monitoring service started");
+    } catch (e) {
+      debugPrint("BACKGROUND SERVICE ERROR: $e");
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-
-    FlutterOverlayWindow.overlayListener.listen((data) {
-      debugPrint("MAIN APP: Received overlay data = $data");
-
-      if (data == "reset_shield") {
-        if (!mounted) return;
-
-        setState(() {
-          _shieldActive = false;
-          faceCount = 0;
-        });
-
-        debugPrint("SHIELD: Reset received. Detection resumed.");
-      }
-    });
-
     _initializeCamera();
+
+    _shieldCheckTimer = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) async {
+        if (!_shieldActive) return;
+
+        final active = await FlutterOverlayWindow.isActive();
+
+        if (!active) {
+          _shieldActive = false;
+
+          if (mounted) {
+            setState(() {
+              faceCount = 0;
+            });
+          }
+
+          debugPrint("SHIELD: Overlay closed. Detection resumed.");
+        }
+      },
+    );
   }
 
   Future<void> _initializeCamera() async {
@@ -64,6 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _cameraReady = true;
       });
+
+      await _startBackgroundMonitoring();
+
+      _detectionTimer = Timer.periodic(
+        const Duration(milliseconds: 700),
+        (_) => _detectFaces(),
+      );
 
       _detectionTimer = Timer.periodic(
         const Duration(milliseconds: 700),
@@ -103,21 +129,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final threat = ThreatDetector.isThreat(faces.length);
 
-      if (protectionEnabled) {
-        if (threat) {
-          _shieldActive = true;
+      if (threat && !_shieldActive) {
+        _shieldActive = true;
 
-          debugPrint("SHIELD: Threat detected. Stopping detection.");
+        debugPrint("SHIELD: Threat detected. Stopping detection.");
 
-          try {
-            await PrivacyManager.activatePrivacyShield();
-            debugPrint("SHIELD: Privacy shield activated");
-          } catch (e) {
-            debugPrint("SHIELD ERROR: $e");
-          }
-
-          return;
+        try {
+          await PrivacyManager.activatePrivacyShield();
+          debugPrint("SHIELD: Privacy shield activated");
+        } catch (e) {
+          debugPrint("SHIELD ERROR: $e");
         }
+
+        return;
       }
 
       debugPrint(
@@ -138,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _detectionTimer?.cancel();
+    _shieldCheckTimer?.cancel();
     _faceDetector.dispose();
     _cameraService.dispose();
     super.dispose();
