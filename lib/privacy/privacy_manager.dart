@@ -2,20 +2,19 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter/foundation.dart';
 
 class PrivacyManager {
-  static bool _isShieldActive = false;
-
   static Future<void> activatePrivacyShield() async {
     try {
       bool? hasPermission = await FlutterOverlayWindow.isPermissionGranted();
+
       if (hasPermission != true) {
         hasPermission = await FlutterOverlayWindow.requestPermission();
+
         if (hasPermission != true) return;
       }
 
       bool isActive = await FlutterOverlayWindow.isActive();
 
-      if (!isActive && !_isShieldActive) {
-        _isShieldActive = true;
+      if (!isActive) {
         await FlutterOverlayWindow.showOverlay(
           enableDrag: false,
           flag: OverlayFlag.defaultFlag,
@@ -23,6 +22,8 @@ class PrivacyManager {
           visibility: NotificationVisibility.visibilityPublic,
           positionGravity: PositionGravity.none,
         );
+
+        debugPrint("SHIELD: Overlay shown");
       }
     } catch (e) {
       debugPrint("Overlay activation error: $e");
@@ -33,8 +34,7 @@ class PrivacyManager {
     try {
       bool isActive = await FlutterOverlayWindow.isActive();
 
-      if (isActive && _isShieldActive) {
-        _isShieldActive = false;
+      if (isActive) {
         await FlutterOverlayWindow.closeOverlay();
         debugPrint("SHIELD: Overlay closed");
       }
