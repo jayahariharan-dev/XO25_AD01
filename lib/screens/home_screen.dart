@@ -14,6 +14,8 @@ import '../widgets/face_counter.dart';
 import '../widgets/monitoring_card.dart';
 import '../privacy/privacy_manager.dart';
 
+import 'package:flutter/services.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -33,6 +35,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final CameraService _cameraService = CameraService();
   final FaceDetectorService _faceDetector = FaceDetectorService();
+
+  Future<void> _startBackgroundMonitoring() async {
+    try {
+      await const MethodChannel('lookout/background_monitoring')
+          .invokeMethod('startService');
+
+      debugPrint("BACKGROUND: Monitoring service started");
+    } catch (e) {
+      debugPrint("BACKGROUND SERVICE ERROR: $e");
+    }
+  }
 
   @override
   void initState() {
@@ -70,6 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _cameraReady = true;
       });
+
+      await _startBackgroundMonitoring();
+
+      _detectionTimer = Timer.periodic(
+        const Duration(milliseconds: 700),
+        (_) => _detectFaces(),
+      );
 
       _detectionTimer = Timer.periodic(
         const Duration(milliseconds: 700),
